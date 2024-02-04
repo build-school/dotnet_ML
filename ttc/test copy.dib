@@ -1,0 +1,58 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"},{"aliases":["frontend"],"name":"vscode"}]}}
+
+#!fsharp
+
+//#r "nuget: torchsharp-cpu" //for cpu
+//#r "nuget: libtorch-cuda-11.3-win-x64"
+#r "nuget: torchsharp-cuda-windows" //for gpu
+#r "nuget: TorchSharp"
+#r "nuget: TfCheckpoint"   
+#r "nuget: FsBERTTokenizer"
+#r "nuget: FSharp.Data"
+open TfCheckpoint
+open TorchSharp
+
+let device = if torch.cuda_is_available() then torch.CUDA else torch.CPU
+printfn $"torch devices is %A{device}"
+
+#!fsharp
+
+let bertCheckpointFolder = @".\Variables"
+let tensors = CheckpointReader.readCheckpoint bertCheckpointFolder |> Seq.toArray
+//show first tensor
+printfn "%A" tensors.[0]
+
+#!fsharp
+
+type WeatherInput =
+    {
+        // Ignore date column
+        [<LoadColumn(1)>]
+        CloudCover: Single // in oktas
+        [<LoadColumn(2)>]
+        Sunshine: Single // in hours
+        [<LoadColumn(3)>]
+        GlobalRads: Single // Global radiation in Watt / square meter
+        [<LoadColumn(4)>]
+        MaxTemp: Single // Celsius
+        [<LoadColumn(5)>]
+        MeanTemp: Single // Celsius
+        [<LoadColumn(6)>]
+        MinTemp: Single // Celsius
+        [<LoadColumn(7)>]
+        Precipitation: Single // This is the precipitation in millimeters. This is what we want to predict
+        [<LoadColumn(8)>]
+        Pressure: Single // In Pascals
+        // Ignore snow depth since that won't be known at time of prediction and is related to Precipitation
+    }
+
+#!fsharp
+
+let context = MLContext()
+
+#!fsharp
+
+let data = context.Data.LoadFromTextFile<WeatherInput>("london_weather.csv", hasHeader = true, separatorChar=',')
+data.Schema

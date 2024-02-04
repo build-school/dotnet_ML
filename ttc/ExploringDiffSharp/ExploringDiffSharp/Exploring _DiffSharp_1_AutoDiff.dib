@@ -1,0 +1,378 @@
+#!markdown
+
+# Exploring DiffSharp: Automatic Differentiation
+
+#!fsharp
+
+#r "nuget: DiffSharp-lite, 1.0.1"
+
+Formatter.SetPreferredMimeTypesFor(typeof<obj>, "text/plain")
+Formatter.Register(fun x writer -> fprintfn writer "%120A" x )
+
+open DiffSharp
+open DiffSharp.Data
+open DiffSharp.Util // required for print
+open System.Diagnostics
+open System
+
+dsharp.config(dtype=Dtype.Float32, device=Device.CPU)
+
+#!markdown
+
+## Differentiation
+
+#!markdown
+
+### Defining scalar functions and taking the gradient
+
+#!fsharp
+
+let ten1 = dsharp.tensor([1, 2, 3, 4, 5], dtype=Float32)
+let ten2 = dsharp.tensor([1, 2, 3], dtype=Float32)
+
+let f(x: Tensor) = dsharp.sum(x ** 2) 
+// this is: x² + y² + z² + w² 
+// where each element of x corresponds to a parameter (x[0] = x, x[1] = y, x[2] = z, x[3] = w)
+// and more elements in the tensor would be equal to more parameters 
+// alternatively:
+let f_alt(x: Tensor) = x[0] ** 2 + x[1] ** 2 + x[2] ** 2 + x[3] ** 2 
+// where you have 4 parameters in the function and if for this example x was larger 
+// than 4 elements f_alt still works, but since x[4] isn't part of the function
+// the result differs from f()
+print("f_alt(): ", f_alt(ten1)) // 1 + 2² + 3² + 4² = 1 + 4 + 9 + 16 = 30
+// vs the first implementation:
+print("f(): ", f(ten1)) // --> 55
+
+// computing the gradient
+let df = dsharp.grad(f)
+let df_alt = dsharp.grad(f_alt)
+
+print("df(): ", df(ten1))     // --> [2, 4, 6, 8, 10]
+print("df_alt(): ", df_alt(ten1)) // --> [2, 4, 6, 8, 0]
+// print(f_alt(ten2)) 
+// --> Index outside the bounds of Tensor shape [|3|], because f_alt expect the input to 
+// have at least 4 elements
+print("f(): ", f(ten2)) // --> 14 , f can handle any amount of elements
+print("df(): ", df(ten2)) // --> [2, 4, 6], and so can the gradient of f
+//print(df_alt(ten2)) 
+// --> Index outside the bounds of Tensor shape [|3|]
+// df_alt() just like f_alt expect x to have at least 4 elements
+
+#!markdown
+
+### Taking the Hessian
+
+#!fsharp
+
+let hf = dsharp.hessian(f)
+let hf_alt = dsharp.hessian(f_alt)
+
+print("Hessian of f for ten1 & ten2: ")
+print(hf(ten1))
+print(hf(ten2))
+print("-------------------------------------")
+let ten3 = dsharp.tensor([1, 2, 3, 4], dtype=Float32)
+print("Hessian of f_alt for ten1 & ten3: ")
+print(hf_alt(ten1))
+print(hf_alt(ten3))
+// hf_alt(ten2) would not work because of the same reason reasons as previously
+
+#!fsharp
+
+// a more interesting example:
+let g(x: Tensor) = x[0]**2 + x[1]**3 + x[2]*x[0] + sin(x[1]) // 3 parameters: x[0], x[1], x[2]
+
+let hg = dsharp.hessian(g) 
+// | 2         0         1  |
+// | 0   6*x1 - sin(x1)  0  |
+// | 1         0         0  |
+
+// ten2 = [1, 2, 3]
+// expected result:
+// | 2         0         1  |
+// | 0   6*2 - sin(2)    0  |    sin(2) = 0.90929... --> 12 - sin(2) = 11.0907...
+// | 1         0         0  |
+print(hg(ten2))
+
+#!markdown
+
+### Piecewise functions: gradient and hessian
+
+#!fsharp
+
+let p(x: Tensor) = 
+    if x > dsharp.tensor(0.) then
+        x**2
+    elif x > dsharp.tensor(-2.0) && x <= dsharp.tensor(0.) then
+        x*3
+    else
+        dsharp.tensor(3) + 0 * x 
+        // 0 * x is necessary because DiffSharp cant take the derivative of a constant tensor
+
+let dp = dsharp.grad(p)
+
+// derivatives also only work for floating point inputs
+print(dp(dsharp.tensor(3.))) // --> 6
+print(dp(dsharp.tensor(-1.5))) // --> 3
+print(dp(dsharp.tensor(-3.))) // --> 0
+
+let ten4 = dsharp.tensor([1.])
+let ten5 = dsharp.tensor([4., -3.])
+
+//print(p(ten4))                 // --> Cannot compare non-scalar tensors
+//print(dp(dsharp.tensor([3.]))) // --> Cannot compare non-scalar Tensors
+// instead if you want to apply this kind of function to a tensor with several elements do:
+print(dsharp.map (fun x -> p(x))  ten5)
+
+// or define a function for it
+let p_el(x) = dsharp.map (fun x -> p(x)) x
+print(p_el(ten5))
+
+// the above definition of p only works on a single value / scalar tensor
+// naturally if we want more parameters in a piecewise function:
+let p2(x: Tensor) = 
+    if x[0] > dsharp.tensor(1.) && x[1] > dsharp.tensor(1.) then
+        x[0]**2 + x[0] * x[1]
+    else
+        x[0] + x[1] + x[1] * x[0] ** 2
+        // x[0] * (x[0] * x[1] + 1) + x[1]
+
+// we can get the gradient and the hessian
+let dp2 = dsharp.grad(p2)
+let hp2 = dsharp.hessian(p2)
+
+// ten5 = [4., -3.] --> fails first condition --> p2(ten5) = x0 + x1 + x1 * x0**2
+// --> dp2/dx = 
+//  | 1 + x1*x0*2 |   --> dp2/dx0
+//  | 1 + x0**2   |   --> dp2/dx1
+// expected output:
+//  | -23 |
+//  |  17 |
+print(dp2(ten5))
+
+//  | 2*x1   2*x0 |
+//  | 2*x0   0    |
+// expected output:
+//  | -6     8 |
+//  |  8     0 |
+print(hp2(ten5))
+
+#!fsharp
+
+let dhp2 = dsharp.gradhessian(p2)  // calculates gradient and hessian
+print(dhp2(ten5))
+
+let jacp2 = dsharp.jacobian(dp2)
+print(jacp2(ten5))
+
+#!markdown
+
+### Jacobian
+
+#!fsharp
+
+// dsharp.jacobian() operates on a vector to vector function
+let funx(x: Tensor) = x**2 + x * dsharp.tensor([1, 0]) 
+//  | x0**2 + x0 |
+//  | x1**2      | 
+print(funx(ten5))
+
+let jacfunx = dsharp.jacobian(funx)
+//  | 2*x0 + 1      0 |
+//  | 0          2*x1 |
+print(jacfunx(ten5))
+
+#!fsharp
+
+let funx2(x: Tensor) = 
+    x**2 + x[1] * dsharp.tensor([1., 0.]) + dsharp.tensor([0., 2.]) * sin(2*x[0])
+//  | x0**2 + x1          |
+//  | x1**2 + 2*sin(2*x0) | 
+print(funx2(ten5)) // ten5 = [4, -3]
+
+let jacfunx = dsharp.jacobian(funx2)
+//  | 2*x0 + 1         1 |
+//  | 4*cos(2*x0)   2*x1 |
+print(jacfunx(ten5))
+
+#!markdown
+
+### Curl, divergence and laplacian
+
+#!fsharp
+
+// curl:
+let funx3(x: Tensor) = 
+    x * (dsharp.tensor([1.5, 2.5, -1.2]) +  x * dsharp.tensor([0.34, 1.12, 2.3])) + sin(x[0]) * dsharp.tensor([0., 0., 1.])
+// funx3 =
+//  | 0.34 * x0**2 + 1.5*x0           |
+//  | 1.12 * x1**2 + 2.5*x1           |
+//  | 2.3 * x2**2 -1.2 * x2 + sin(x0) |
+
+let curlfunx3 = dsharp.curl funx3
+// curlfunx3 =
+// |    0 - 0    |
+// | 0 - cos(x0) |
+// |    0 - 0    |
+let ten6 = dsharp.tensor([1.0, 2.0, 3.0])
+curlfunx3(ten6)
+
+#!fsharp
+
+// divergence:
+let divfunx3 = dsharp.divergence(funx3)
+// divfunx3 =
+// 0.68*x0 + 1.5 + 2.24*x1 + 2.5 + 4.6*x2 - 1.2
+print(divfunx3(ten6))
+
+// curldivergence:
+// returns the curl and the divergence
+let curldivfunx3 = dsharp.curldivergence(funx3)
+print(curldivfunx3(ten6))
+
+// laplacian:
+let funx4(x: Tensor) = 
+    x[0] * x[1] + x[2]**3 + x[0] * 3
+
+let lapfunx4 = dsharp.laplacian(funx4)
+// grad(funx4) = 
+//  | x1 + 3    |
+//  | x0        |
+//  | 3 * x2**2 |
+// lapfunx4 = div(grad(funx4)) = 
+// 6 * x2
+print(lapfunx4(ten6))
+
+#!markdown
+
+### Using diff
+
+#!fsharp
+
+let x0 = dsharp.tensor 3.
+let y0 = dsharp.tensor 2.
+
+// capable of taking nested derivatives
+let nestf(x0, y0) = dsharp.diff (fun x -> x * dsharp.diff (fun y -> x * y) y0) x0
+// d/dx(x * d/dy(x*y))
+// --> d/dx(x * x)
+// --> 2*x
+print(nestf(x0, y0))
+
+// take second order derivative
+let diff2t = dsharp.diff2 (fun x -> x * (3 + x))
+// d²/dx²(x**2 + 3*x) = 2
+print(diff2t(x0))
+
+// take n-th order derivative , here n = 3
+let diffnt = dsharp.diffn 3 (fun y -> y * (2 + sin(y)))  
+// d/dy(2*y + y*sin(y)) = 2 + sin(y) + y*cos(y)
+// d/dy(2 + sin(y) + y*cos(y)) = cos(y) + cos(y) - y*sin(y)
+// d/dy(cos(y) + cos(y) - y*sin(y)) = -sin(y) - sin(y) - sin(y) -y*cos(y)
+print(diffnt(y0))
+
+#!markdown
+
+## Working with Tensors
+
+#!fsharp
+
+let t0 = dsharp.tensor 1 // 0D Tensor / scalar tensor 
+let t1 = dsharp.tensor [1, 2, 3]  // 1D Tensor / vector
+let t2 = dsharp.tensor [[1, 2, 3], [3, 4, 5]]  // 2D Tensor / matrix
+let t3 = dsharp.tensor [[[1, 2, 3], [2, 3, 2], [1, 2, 3]], [[1, 2, 3], [2, 3, 2], [1, 2, 3]], [[1, 2, 3], [2, 3, 2], [1, 2, 3]]]
+// 3D Tensor ^
+// etc...
+// print(t3)
+
+let t_in = dsharp.tensor [0.0 ..0.2.. 0.8]
+print(t_in)
+
+let t_arange = dsharp.arange(10., step=1.)  // dtype float 
+// dsharp.arange(endVal, startVal, step, ...) 
+print(t_arange)
+print(dsharp.arangeLike(t_arange, 13, step=2))  // dtype int
+
+let t_fullLike = dsharp.fullLike(t_arange, 2.) // takes the shape of t_arange
+print(t_fullLike)
+
+let t_onesLike = dsharp.onesLike(t_arange, shape=[5; 2])  
+// shape can be used to change the shape 
+// (it doesn't have to have the same size as the input tensor)
+print(t_onesLike)
+
+// dsharp.zerosLike() works the same as onesLike
+// there also is zeroLike() and oneLike() which return a scalar tensor
+
+#!fsharp
+
+let t_ones = dsharp.ones([2; 4]) // return tensor with ones of the given shape
+print(t_ones)
+print(dsharp.zeros([2; 4]))      // return tensor with zeros of the given shape
+
+print(dsharp.clone(t_arange))    // from documentation: Returns a new tensor with the same characteristics and storage cloned.
+
+print(dsharp.empty(5))           // from the documentation: Returns a new uninitialized tensor filled with arbitrary values for the given 
+                                 // length, element type and configuration 
+print(dsharp.empty([1; 4]))      // same as before but with a shape
+
+print(dsharp.eye(2))
+print(dsharp.eye(2, 3))
+
+#!fsharp
+
+let t_linspace = dsharp.linspace(0., 10., 100)
+print(t_linspace)
+
+// dsharp.load(fileName, ?device, ?dtype, ?backend) 
+// Loads the tensor from the given file using the given element type and configuration.
+// The backend at the time of saving the tensor must be available when the tensor is reloaded. The tensor is 
+// first loaded into that backend and then moved. As a result, intermediate tensors may be 
+// created in the process of reloading. 
+//
+// dsharp.save(tensor, filename)
+// Saves the tensor to the given file using a bespoke binary format.
+// The binary format records the elements, backend, element type and shape. It does not record the device. 
+// The format used may change from version to version of DiffSharp. 
+
+let t_logspace = dsharp.logspace(0., 3., steps=3, baseVal = 2)
+print(t_logspace)
+
+print(dsharp.one())    // alternatives to writing dsharp.tensor(0) / dsharp.tensor(1) /dsharp.tensor(number)
+print(dsharp.zero())
+print(dsharp.scalar(2.))
+
+#!fsharp
+
+// Random tensors:
+dsharp.seed(23) // from the doc: Seeds all backends with the given random seed, or a new seed based on the current time if no seed is specified. 
+
+print(dsharp.rand(10))  // Uniform distribution [0, 1)
+print(dsharp.rand([2; 2]))
+print(dsharp.randLike(t_logspace))
+
+print(dsharp.randint(0, 10, 4))  // random integers
+print(dsharp.randint(0, 5, [2; 2]))
+print(dsharp.randintLike(t_logspace, 0, 20))
+
+print(dsharp.randn(10))  // Normal distribution [0, 1)
+print(dsharp.randn([2; 2]))
+print(dsharp.randnLike(t_logspace))
+
+#!markdown
+
+### Some operations to change shapes
+- there's plenty more than shown here
+
+#!fsharp
+
+let test_ten = dsharp.randn([3; 4])
+
+print(test_ten)
+print(test_ten.view([1; -1]))
+print(test_ten.view([3; 2; 2]))
+
+#!fsharp
+
+print(test_ten.view([1; -1]).squeeze())
+print(test_ten.unsqueeze(0)) // try it with 1 / 2

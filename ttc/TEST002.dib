@@ -1,0 +1,111 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":["c#","cs"],"languageName":"C#","name":"csharp"},{"aliases":["f#","fs"],"languageName":"F#","name":"fsharp"},{"aliases":[],"languageName":"HTML","name":"html"},{"aliases":[],"languageName":"http","name":"httpRequest"},{"aliases":["js"],"languageName":"JavaScript","name":"javascript"},{"aliases":[],"languageName":"KQL","name":"kql"},{"aliases":[],"languageName":"Mermaid","name":"mermaid"},{"aliases":["powershell"],"languageName":"PowerShell","name":"pwsh"},{"aliases":[],"languageName":"SQL","name":"sql"},{"aliases":[],"name":"value"},{"aliases":["frontend"],"name":"vscode"}]}}
+
+#!fsharp
+
+#r "nuget:Microsoft.ML"
+
+#!fsharp
+
+#r "nuget:DataView.InteractiveExtension,*-*"
+#r "nuget:Microsoft.ML.DataView"
+#r "nuget: Microsoft.Data.Analysis"
+//#r "nuget:SandDance.InteractiveExtension,*-*"
+
+#!fsharp
+
+//https://accessibleai.dev/post/mlnet_fsharp_regression/
+
+#!fsharp
+
+open Microsoft.ML
+open Microsoft.ML.Data
+
+#!fsharp
+
+type WeatherInput =
+    {
+        // Ignore date column
+        [<LoadColumn(1)>]
+        CloudCover: Single // in oktas
+        [<LoadColumn(2)>]
+        Sunshine: Single // in hours
+        [<LoadColumn(3)>]
+        GlobalRads: Single // Global radiation in Watt / square meter
+        [<LoadColumn(4)>]
+        MaxTemp: Single // Celsius
+        [<LoadColumn(5)>]
+        MeanTemp: Single // Celsius
+        [<LoadColumn(6)>]
+        MinTemp: Single // Celsius
+        [<LoadColumn(7)>]
+        Precipitation: Single // This is the precipitation in millimeters. This is what we want to predict
+        [<LoadColumn(8)>]
+        Pressure: Single // In Pascals
+        // Ignore snow depth since that won't be known at time of prediction and is related to Precipitation
+    }
+
+#!fsharp
+
+let context = MLContext()
+
+#!fsharp
+
+let data = context.Data.LoadFromTextFile<WeatherInput>("london_weather.csv", hasHeader = true, separatorChar=',')
+data.Schema
+
+#!fsharp
+
+let numRows = 3
+data.Preview(numRows).RowView
+
+#!fsharp
+
+data.Preview().ColumnView
+
+#!fsharp
+
+// Split into train and test splits to detect overfitting
+let split = context.Data.TrainTestSplit(data, testFraction = 0.2)
+
+let testSet = split.TestSet   // 20 % of the data (0.2)
+let trainSet = split.TrainSet // 80 % of the data (0.8)
+
+#!fsharp
+
+let featureArray = [|"CloudCover";"Sunshine";"GlobalRads";"MaxTemp";"MeanTemp";"MinTemp";"Pressure"|]
+
+let processPipeline = EstimatorChain()
+                        .Append(context.Transforms.CopyColumns("Label", "Precipitation"))
+                        .Append(context.Transforms.NormalizeMeanVariance("CloudCover", "CloudCover"))
+                        .Append(context.Transforms.NormalizeMeanVariance("Sunshine", "Sunshine"))
+                        .Append(context.Transforms.NormalizeMeanVariance("GlobalRads", "GlobalRads"))
+                        .Append(context.Transforms.NormalizeMeanVariance("MaxTemp", "MaxTemp"))
+                        .Append(context.Transforms.NormalizeMeanVariance("MeanTemp", "MeanTemp"))
+                        .Append(context.Transforms.NormalizeMeanVariance("MinTemp", "MinTemp"))
+                        .Append(context.Transforms.NormalizeMeanVariance("Pressure", "Pressure"))
+                        .Append(context.Transforms.Concatenate("Features", featureArray))
+
+#!fsharp
+
+let trainer = context.Regression.Trainers.OnlineGradientDescent(labelColumnName = "Label", featureColumnName = "Features")
+
+// Generate a training pipeline based on the processing pipeline mixed with the trainer
+let trainingPipeline = processPipeline.Append trainer
+
+#!fsharp
+
+let model = trainingPipeline.Fit trainSet
+
+#!fsharp
+
+let testResults = model.Transform testSet
+
+let testMetrics = context.Regression.Evaluate(testResults, "Label", "Score")
+
+testMetrics
+
+#!csharp
+
+System.Tuple.Create(1,2,3)

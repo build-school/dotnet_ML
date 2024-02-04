@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>LostTech.Torch.MinGPT</AssemblyName>
+    <RootNamespace>LostTech.Torch.NN</RootNamespace>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+    <VersionPrefix>0.3.0</VersionPrefix>
+    <Nullable>enable</Nullable>
+
+    <!-- Package stuff -->
+    <Description>C# + TorchSharp implementation of GPT</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/losttech/Torch.MinGPT</PackageProjectUrl>
+    <PackageTags>PyTorch;TorchSharp;text-processing;deep-learning;ML;AI;GPT;text-completion;transformer;NLP</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <Authors>Victor Nova</Authors>
+    <Company>Lost Tech LLC</Company>
+    <Product>LostTech.Torch</Product>
+    <!--<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>-->
+
+    <!-- The following is recommended for public projects -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <DebugSymbols>true</DebugSymbols>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <RepositoryUrl>https://github.com/losttech/Torch.MinGPT.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\app\ArrayTools.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="" />
+    <None Include="..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The following is recommended for public projects -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+    <PackageReference Include="TorchSharp" Version="0.99.6" />
+  </ItemGroup>
+
+</Project>

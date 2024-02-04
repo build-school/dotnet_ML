@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "fsdocs-tool": {
+      "version": "15.0.0",
+      "commands": [
+        "fsdocs"
+      ]
+    },
+    "coveralls.net": {
+      "version": "3.0.0",
+      "commands": [
+        "csmacnz.Coveralls"
+      ]
+    }
+
+  }
+}

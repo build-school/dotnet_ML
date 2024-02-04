@@ -1,0 +1,334 @@
+#!markdown
+
+# Exploring DiffSharp: Neural Networks
+
+#!fsharp
+
+#r "nuget: DiffSharp-lite, 1.0.1"
+
+Formatter.SetPreferredMimeTypesFor(typeof<obj>, "text/plain")
+Formatter.Register(fun x writer -> fprintfn writer "%120A" x )
+
+open DiffSharp
+open DiffSharp.Util // required for print and other stuff
+open DiffSharp.Model
+open System.Diagnostics   // not required
+open System               // not required
+
+dsharp.config(dtype=Dtype.Float32, device=Device.CPU)
+
+#!markdown
+
+## Defining Neural Network Layers
+
+#!markdown
+
+The below cell defines a Linear Layer where the bias can be turned off by setting **bias** to *false*
+
+#!fsharp
+
+type LinearB(inFeatures, outFeatures, ?bias: bool) =
+    inherit Model()
+    let bias = defaultArg bias true
+
+    let w = Parameter(Weight.kaiming(inFeatures, outFeatures))  // defining a parameter and its initialization function
+    let k = 1./sqrt (float outFeatures)
+    let b = Parameter(Weight.uniform([|outFeatures|], k))
+    do base.addParameter([w;b],["Linear-weight";"Linear-bias"])
+
+    override _.ToString() = sprintf "Linear(%A, %A)" inFeatures outFeatures
+    
+    override _.forward(value) =
+        if bias then dsharp.matmul(value, w.value) + b.value else dsharp.matmul(value, w.value) + 0. * b.value
+
+#!markdown
+
+## Defining an initialization function
+
+#!markdown
+
+Next we define a Linear Layer that allows both, biases to be turned of as well as a custom initialization function
+and then we create a new initialization function.
+
+Most predefined Layers do not have the option to specify an initialization function, but with a few changes they can.
+
+#!fsharp
+
+type LinearBI(inFeatures, outFeatures, ?bias: bool, ?initFun) =
+    inherit Model()
+    let bias = defaultArg bias true
+    let initFun = defaultArg initFun Weight.kaiming
+
+    let w = Parameter(initFun(inFeatures, outFeatures))  // defining a parameter and its initialization function
+    let k = 1./sqrt (float outFeatures)
+    let b = Parameter(Weight.uniform([|outFeatures|], k))
+    do base.addParameter([w;b],["Linear-weight";"Linear-bias"])
+
+    override _.ToString() = sprintf "Linear(%A, %A)" inFeatures outFeatures
+    
+    override _.forward(value) =
+        if bias then dsharp.matmul(value, w.value) + b.value else dsharp.matmul(value, w.value) + 0. * b.value
+
+
+type InitLayer =                                            // this initialization function makes no sense it is just intended as an example
+    static member initfunx(fanIn, fanOut, ?a: float) = 
+        let a = defaultArg a (3.141528)
+        dsharp.randint(-3, 23, [fanIn; fanOut]) * a 
+
+#!fsharp
+
+dsharp.seed(23)
+
+// creating two models with a custom init function
+let model_custom = 
+    LinearBI(1, 10, false, InitLayer.initfunx)
+    --> dsharp.relu
+    --> Linear(10, 1)
+
+dsharp.seed(23)
+let model_default = 
+    LinearBI(1, 10, false)
+    --> dsharp.relu
+    --> Linear(10, 1)
+
+
+
+let test_data = dsharp.tensor([1., 2., 3.])
+print $"Custom init function:\n{test_data.view([-1; 1]) --> model_custom}\n------------------------------------------------------"
+print $"default init function:\n{test_data.view([-1; 1]) --> model_default}\n------------------------------------------------------"
+
+
+// if the initialization function takes more arguments or different arguments 
+// e.g. a shape like [|inFeatures, outFeatures|] creating a function like this works:
+let initfunx2(fanIn, fanOut) = 
+    InitLayer.initfunx(fanIn, fanOut, 3.141528)   
+    // 3.141528 is the default value of the init function, therefore the result below will be identical to the first one
+    // change the value to obtain different results
+
+dsharp.seed(23)
+let model3 = 
+    LinearBI(1, 10, false, initfunx2)
+    --> dsharp.relu
+    --> Linear(10, 1)
+
+print $"Custom init function wrapped by another function:\n{test_data.view([-1; 1]) --> model3}"
+
+#!markdown
+
+## Handling Datasets
+
+#!markdown
+
+DiffSharp offers a few ways to handle the most common types of Datasets:
+- Images
+- Text
+- Tensors (e.g. time series)
+
+DiffSharp.Data contains the necessary utilities, TensorDataset, ImageDataset, TextDataset.  
+Furthermore there's a few well known Datasets available: CIFAR10, CIFAR100, MNIST
+
+#!fsharp
+
+open DiffSharp.Data
+
+let x_data = (dsharp.rand([256]) - 0.5) * 9
+
+// a polynomial of degree 4
+let poly(x:  Tensor) = 
+    x * x * x * x + x * x * x - 11 * x * x - 5 * x + 30
+
+let y_data = poly(x_data)
+let epochs = 4000
+
+// TensorDataset takes the input data as a tensor and the labels/target as a tensor
+let ds = TensorDataset(x_data, y_data)
+
+ds.Display()
+print(ds.GetHashCode())
+print(ds.ToString())
+print(ds.ToDisplayString())
+print(ds.length)    // get the length of the dataset
+print(ds.Item(0))   // get specific items
+print(ds.GetType()) // get the type of the dataset e.g. TensorDataSet, ImageDataset ...
+print(ds.filter(fun x y -> (float x) > 1.))  
+// filters and returns the dataset where x in this case corresponds to the values from 
+// x_data and y corresponds to the values from y_data
+print(ds.Equals(ds))
+print(ds.loader(2, true, false))  // returns a DataLoader, specified by the options below
+// available options:
+//   batchSize    : int  *
+//   shuffle      : option<bool>  *
+//   dropLast     : option<bool>  *
+//   device       : option<Device>  *   // typically the dataset is on the CPU
+//   dtype        : option<Dtype>  *
+//   backend      : option<Backend>  *
+//   targetDevice : option<Device>  *   // device where the actual training is done
+//   targetDtype  : option<Dtype>  *
+//   targetBackend: option<Backend> 
+
+// here's the train loader that is used to train the NN in the next chapter
+let batchsize = 128
+let trainLoader = ds.loader(batchsize)
+
+#!markdown
+
+### The Dataloader
+
+#!markdown
+
+These are the most important functions related to the DataLoader.
+
+#!fsharp
+
+print(trainLoader.batch()) // returns a single batch of inputs and targets of the previously
+                           // selected size (can optionally be specified to a different value)
+
+print(trainLoader.epoch()) // trainLoader.epoch() returns a sequence of the batch number
+                           // the inputs and the targets of the batch
+                           
+print(trainLoader.length)  // returns the number of batches
+
+#!markdown
+
+## Building and training Neural Networks
+
+#!markdown
+
+Several loss functions are included by default:
+- dsharp.nllLoss
+- dsharp.crossEntropyLoss
+- dsharp.mseLoss
+- dsharp.bceLoss
+
+And there also are quite a few [layers](https://diffsharp.github.io/reference/diffsharp-model.html) available.
+
+When it comes to optimizers there's only two:
+- SGD
+- Adam
+
+#!fsharp
+
+open DiffSharp.Optim
+open DiffSharp.Compose
+
+// defining a custom loss function 
+let absolute_loss(input, target) = 
+    dsharp.sum(abs(input - target))
+
+// models can be very conveniently composed like this:
+let model = 
+    LinearB(1, 36)
+    --> dsharp.leakyRelu(0.1)
+    --> LinearB(36, 10)
+    --> dsharp.relu
+    --> LinearB(10, 1, false)
+
+// defining several optimizers to imitate a learn rate schedule
+let optimizer = Adam(model, dsharp.tensor(0.0075))
+let optimizer2 = Adam(model, dsharp.tensor(0.002))
+let optimizer3 = Adam(model, dsharp.tensor(0.0005))
+
+for epoch = 1 to epochs do
+    let batches = trainLoader.epoch()
+    for i, input, target in batches do
+        model.reverseDiff()
+
+        let output = input.view([-1; 1]) --> model
+
+        // mean squared error loss
+        //let msel = dsharp.mseLoss(output, target.unsqueeze(1))    
+        //msel.reverse()
+
+        // absolute loss
+        let abserr = absolute_loss(output, target.unsqueeze(1))
+        abserr.reverse()
+
+        if epoch % 100 = 0 then
+            print(abserr)           // prints the errror every 100 epochs
+
+        // since theres no learnrate scheduling, here is a naive way to
+        // implement it:
+        if epoch <= 1000 then
+            optimizer.step()
+        if epoch > 1000  && epoch <= 3000 then
+            optimizer2.step()
+        if epoch > 3000 then
+            optimizer3.step()
+
+    if epoch % 500 = 0 then
+        print $"Epoch: {epoch}"
+
+#!markdown
+
+More examples, for example a RNN, GAN, VAE, VAE-CNN and classifier can be found at the official DiffSharp Github.
+
+#!markdown
+
+## Plotting Results
+
+#!markdown
+
+DiffSharp offers a few simple options to create plots. (open DiffSharp.Util)  
+You can create line plots and histograms and save them to files.
+
+#!fsharp
+
+let x_order = dsharp.arange(6.1, 0, 0.1) - 3 
+let y_order = poly(x_order)
+
+#!fsharp
+
+let res = x_order.view([-1; 1]) --> model
+
+let plt = Pyplot("/home/martin/anaconda3/bin/python")     // insert path to python binary here
+plt.plot(x_order, y_order, label="true fun")              // actual function that was approximated
+plt.plot(x_order, res.squeeze(), label="approx fun")      // approximation of the function
+plt.plot(x_order, y_order - res.squeeze(), label="err")   // error line
+plt.xlabel("x")
+plt.ylabel("y")
+plt.legend()
+plt.tightLayout()
+plt.savefig("true_fun_vs_approx_fun")
+
+#!fsharp
+
+let plt = Pyplot("/home/martin/anaconda3/bin/python")     
+plt.plot(x_order, y_order - res.squeeze(), label="err")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.legend()
+plt.tightLayout()
+plt.savefig("Error")
+
+#!markdown
+
+Line plot with only y data:
+
+#!fsharp
+
+let plt = Pyplot("/home/martin/anaconda3/bin/python")     
+plt.plot(y_order, label="Some metric/s") // if x isn't specified x starts at 0 and increases by 1
+plt.xlabel("s")                          // up to the total number of points - 1 
+plt.ylabel("Some metric")
+plt.legend()
+plt.savefig("line_example_plot")
+
+#!markdown
+
+Plotting a histogram:
+
+#!fsharp
+
+let plt = Pyplot("/home/martin/anaconda3/bin/python")     
+plt.hist(x_order, y_order, bins=10, density=false, label="Some metric/s") 
+plt.xlabel("s")
+plt.ylabel("Some metric")
+plt.legend()
+plt.savefig("hist_example_plot")
+
+// options for hist
+// x : Tensor
+// ?weights : Tensor
+// ?bins : int
+// ?density : bool
+// ?label : string 

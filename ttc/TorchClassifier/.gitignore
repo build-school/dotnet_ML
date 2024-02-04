@@ -1,0 +1,19 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+bin
+obj
+.idea
+.vs
+.vscode
+*.user
+*.suo
+/Source/Kio.Rosreestr/Kio.Rosreestr.Inbox.Service/log
+/Source/Kio.Rosreestr/Kio.Rosreestr.Backend/Publish
+/Source/Kio.Rosreestr/Kio.Rosreestr.Inbox.Service/Publish
+/Source/Kio.Rosreestr/Kio.Rosreestr.Palata.Service/Publish
+/Documents/OriginalApp/palata/__recovery
+/Source/Kio.Rosreestr/Kio.Rosreestr.Kafka.Test/Publish
+/Source/Kio.Rosreestr/Kio.Rosreestr.Kafka.Test/kio-rr-kafka-test.zip
+/Documents/DataMapping/PALATA/.~lock.used_tables.xls#

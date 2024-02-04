@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Common.fs" />
+    <Compile Include="Model\Wrappers.fs" />
+    <Compile Include="Model\Config.fs" />
+    <Compile Include="Model\Projection.fs" />
+    <Compile Include="Model\CausalSelfAttention.fs" />
+    <Compile Include="Model\Transformer.fs" />
+    <Compile Include="Model\Gpt.fs" />
+    <Compile Include="Trainer\DataLoader.fs" />
+    <Compile Include="Trainer\Trainer.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TorchSharp-cuda-windows" Version="0.100.4" />
+  </ItemGroup>
+
+</Project>
