@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Program.v3.fsx" />
+    <None Include="Program.v2.fsx" />
+    <None Include="Program.fsx.20240601" />
+    <Compile Include="Program.fsx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FsBERTTokenizer" Version="1.0.0" />
+    <PackageReference Include="FSharp.Data" Version="6.4.0" />
+    <PackageReference Include="FsPickler.Json.nstd20" Version="7.0.1" />
+    <PackageReference Include="FsPickler.nstd20" Version="7.0.1" />
+    <PackageReference Include="TfCheckpoint" Version="1.0.0" />
+    <PackageReference Include="TorchSharp" Version="0.102.4" />
+    <PackageReference Include="TorchSharp-cuda-windows" Version="0.102.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="8.0.300" />
+  </ItemGroup>
+
+</Project>
