@@ -85,18 +85,27 @@ let load_model (model: torch.nn.Module) (fileDir: string) =
     
     model.load_state_dict(stateDict) |> ignore
 
+let save_model (model: torch.nn.Module) (fileDir: string) =
+    //use stream = System.IO.File.Create(filePath)
+    let stateDict = Dictionary<string, torch.Tensor> ()
+
+    model.state_dict(stateDict) |> ignore
+    stateDict
+    |> Seq.iter (fun kvp ->
+        torch.save(kvp.Value,Path.Join(fileDir, kvp.Key.Replace('/', '_') + ".pt"))        
+    )
 
 
 //Note: The module and variable names used here match the tensor name 'paths' as delimted by '/' for TF (see above), 
 //for easier matching.
-type BertEmbedding(ifInitWeight) as this = 
+type BertEmbedding(ifInitWeight,dev:torch.Device) as this = 
     inherit torch.nn.Module("embeddings")
     
-    let word_embeddings         = torch.nn.Embedding(VOCAB_SIZE,HIDDEN,padding_idx=0L)
-    let position_embeddings     = torch.nn.Embedding(MAX_POS_EMB,HIDDEN)
-    let token_type_embeddings   = torch.nn.Embedding(TYPE_SIZE,HIDDEN)
-    let LayerNorm               = torch.nn.LayerNorm([|HIDDEN|],EPS_LAYER_NORM)
-    let dropout                 = torch.nn.Dropout(HIDDEN_DROPOUT_PROB)
+    let word_embeddings         = torch.nn.Embedding(VOCAB_SIZE,HIDDEN,padding_idx=0L,device=dev)
+    let position_embeddings     = torch.nn.Embedding(MAX_POS_EMB,HIDDEN,device=dev)
+    let token_type_embeddings   = torch.nn.Embedding(TYPE_SIZE,HIDDEN,device=dev)
+    let LayerNorm               = torch.nn.LayerNorm([|HIDDEN|],EPS_LAYER_NORM,device=dev)
+    let dropout                 = torch.nn.Dropout(HIDDEN_DROPOUT_PROB).``to``(dev)
 
     do 
         this.RegisterComponents()
@@ -117,11 +126,11 @@ type BertEmbedding(ifInitWeight) as this =
         embeddings --> LayerNorm --> dropout             // the --> operator works for simple 'forward' invocations
 
 
-type BertPooler() as this = 
+type BertPooler(dev:torch.Device) as this = 
     inherit torch.nn.Module<torch.Tensor,torch.Tensor>("pooler")
 
-    let dense = torch.nn.Linear(HIDDEN,HIDDEN)
-    let activation = torch.nn.Tanh()
+    let dense = torch.nn.Linear(HIDDEN,HIDDEN,device=dev)
+    let activation = torch.nn.Tanh().``to``(dev)
 
     let ``:`` = torch.TensorIndex.Colon
     let first = torch.TensorIndex.Single(0L)
@@ -131,31 +140,37 @@ type BertPooler() as this =
 
     override _.forward (hidden_states) =
         let first_token_tensor = hidden_states.index(``:``, first) //take first token of the sequence as the pooled value
+        //task { printfn "first_token_tensor: %A" first_token_tensor.device} |> ignore
         first_token_tensor --> dense --> activation
 
-let dense = torch.nn.Linear(HIDDEN,HIDDEN)
+//let dense = torch.nn.Linear(HIDDEN,HIDDEN)
 
 //dense.GetType().FullName
 //torch.nn.Embedding(VOCAB_SIZE,HIDDEN,padding_idx=0L).GetType().FullName
 
 
-type BertModel(ifInitWeight) as this =
+type BertModel(ifInitWeight,dev:torch.Device) as this =
     inherit torch.nn.Module("bert")
 
-    let embeddings = new BertEmbedding(ifInitWeight)
-    let pooler = new BertPooler()
+    let embeddings = new BertEmbedding(ifInitWeight, dev)
+    let pooler = new BertPooler(dev)
 
-    let encoderLayer = torch.nn.TransformerEncoderLayer(HIDDEN, N_HEADS, MAX_POS_EMB, ATTN_DROPOUT_PROB, activation=ENCODER_ACTIVATION)
-    let encoder = torch.nn.TransformerEncoder(encoderLayer, ENCODER_LAYERS)
+    let encoderLayer = torch.nn.TransformerEncoderLayer(HIDDEN, N_HEADS, MAX_POS_EMB, ATTN_DROPOUT_PROB, activation=ENCODER_ACTIVATION).``to``(dev)    
+    let encoder = torch.nn.TransformerEncoder(encoderLayer, ENCODER_LAYERS).``to``(dev)
+    
 
     do
         this.RegisterComponents()
     
     member this.forward(input_ids:torch.Tensor, token_type_ids:torch.Tensor, position_ids:torch.Tensor,?mask:torch.Tensor) =
         let src = embeddings.forward(input_ids, token_type_ids, position_ids)
+        //task { printfn "src: %A" src.device} |> ignore
         let srcBatchDim2nd = src.permute(1L,0L,2L) //PyTorch transformer requires input as such. See the Transformer docs
+        //task { printfn "srcBatchDim2nd: %A" srcBatchDim2nd.device} |> ignore
         let encoded = match mask with None -> encoder.forward(srcBatchDim2nd, null, null) | Some mask -> encoder.forward(srcBatchDim2nd,mask, null)
+        //task { printfn "encoded: %A" encoded.device} |> ignore
         let encodedBatchFst = encoded.permute(1L,0L,2L)
+        //task { printfn "encodedBatchFst: %A" encodedBatchFst.device} |> ignore
         encodedBatchFst --> pooler
 
 
@@ -206,21 +221,56 @@ let TGT_LEN = classes.Count |> int64
 
 
 let BATCH_SIZE = 128
-let trainBatches = trainSet |> Seq.chunkBySize BATCH_SIZE
+let trainBatches = trainSet |> Array.chunkBySize BATCH_SIZE
 
-let testBatches  = testSet  |> Seq.chunkBySize BATCH_SIZE
+let testBatches  = testSet  |> Array.chunkBySize BATCH_SIZE
 
 let vocabFile = @"C:\anibal\ttc\vocab.txt"
 let vocab = Vocabulary.loadFromFile vocabFile
 
-let position_ids = torch.arange(MAX_POS_EMB).expand(int64 BATCH_SIZE,-1L).``to``(device)
+let position_ids = torch.arange(MAX_POS_EMB,device=device).expand(int64 BATCH_SIZE,-1L)//.``to``(device)
 
 
 //position_ids.data<int64>() //seq [0L; 1L; 2L; 3L; ...]
 
-let b2f (b:YelpReview): Features =
+let inline b2f (b:YelpReview): Features =
     Featurizer.toFeatures vocab true (int MAX_POS_EMB) b.Text ""
 
+type Container =
+    static member batchDict = ConcurrentDictionary<string * int, YelpReview[]>()
+    static member featureDict = ConcurrentDictionary<string * int, Features[]>()
+    static member labelDict = ConcurrentDictionary<string * int, int[]>()
+
+let featurePickle = Path.Join($"{weightDataDir}.pickle","feature")
+let labelPickle = Path.Join($"{weightDataDir}.pickle","label")
+
+let inline toFeature (batchId:string * int) = 
+    Container.featureDict.GetOrAdd(
+        batchId
+        , fun k -> 
+            let fi = Path.Join(featurePickle, string (snd k) + ".pickle") |> FileInfo
+            if fi.Exists then
+                binarySerializer.UnPickle (File.ReadAllBytes fi.FullName)
+            else
+                let f = Container.batchDict[k] |> Array.map b2f
+                File.WriteAllBytes(fi.FullName, binarySerializer.Pickle f)                
+                f
+    )
+    
+
+let inline toLabel (batchId:string * int) = 
+    Container.labelDict.GetOrAdd(
+        batchId
+        , fun k -> 
+            let fi = Path.Join(labelPickle, string (snd k) + ".pickle") |> FileInfo
+            if fi.Exists then
+                binarySerializer.UnPickle (File.ReadAllBytes fi.FullName)
+            else
+                let l = Container.batchDict[k] |> Array.map (fun x->x.Label)
+                File.WriteAllBytes(fi.FullName, binarySerializer.Pickle l)                
+                l
+    )
+    
 //convert a batch to input and output (X, Y) tensors
 let toXY (batch:YelpReview[]) = 
     let xs = batch |> Array.map b2f
@@ -234,20 +284,60 @@ let toXY (batch:YelpReview[]) =
 
 
 
+let toXY2 dev (batchId:string * int)  =
+    let xs = toFeature batchId
+    let d_tkns      = xs |> Seq.collect (fun f -> f.InputIds )  |> Seq.toArray
+    let d_tkn_typs  = xs |> Seq.collect (fun f -> f.SegmentIds) |> Seq.toArray
+    let tokenIds = torch.tensor(d_tkns,     dtype=torch.int).view(-1L,MAX_POS_EMB)        
+    let sepIds   = torch.tensor(d_tkn_typs, dtype=torch.int).view(-1L,MAX_POS_EMB)
+    let Y = torch.tensor(toLabel batchId, dtype=torch.int64).view(-1L)
+    (tokenIds,sepIds),Y
 
-type BertClassification(ifInitWeight) as this = 
+
+let toXY3 (dev:torch.Device) (xs:Features[]) (labels:int[]) =
+    let d_tkns      = xs |> Seq.collect (fun f -> f.InputIds )  |> Seq.toArray
+    let d_tkn_typs  = xs |> Seq.collect (fun f -> f.SegmentIds) |> Seq.toArray
+    let tokenIds = torch.tensor(d_tkns,     dtype=torch.int, device=dev).view(-1L,MAX_POS_EMB).``to``(dev)       
+    let sepIds   = torch.tensor(d_tkn_typs, dtype=torch.int, device=dev).view(-1L,MAX_POS_EMB).``to``(dev)     
+    let Y = torch.tensor(labels, dtype=torch.int64, device=dev).view(-1L).``to``(dev)     
+    (tokenIds,sepIds),Y
+
+
+let inline toXY4 (dev:torch.Device, d_tkns:int[], d_tkn_typs:int[], labels:int[]) =    
+    let tokenIds = torch.tensor(d_tkns,     dtype=torch.int, device=dev).view(-1L,MAX_POS_EMB)//.``to``(dev)       
+    let sepIds   = torch.tensor(d_tkn_typs, dtype=torch.int, device=dev).view(-1L,MAX_POS_EMB)//.``to``(dev)     
+    let Y = torch.tensor(labels, dtype=torch.int64, device=dev).view(-1L)//.``to``(dev)     
+    (tokenIds,sepIds),Y
+
+
+let trainSetIDs =
+    trainBatches
+    |> Array.mapi (fun i c -> 
+        let _ = Container.batchDict.TryAdd (("train", i), c)
+        "train", i
+    )
+
+let testSetIDs =
+    testBatches
+    |> Array.mapi (fun i c -> 
+        let _ = Container.batchDict.TryAdd (("test", i), c)
+        "test", i
+    )
+
+
+type BertClassification(ifInitWeight,dev:torch.Device) as this = 
     inherit torch.nn.Module("BertClassification")
 
-    let bert = new BertModel(ifInitWeight)
-    let proj = torch.nn.Linear(HIDDEN,TGT_LEN)
+    let bert = new BertModel(ifInitWeight, dev)
+    let proj = torch.nn.Linear(HIDDEN,TGT_LEN,device=dev)
 
     do
         this.RegisterComponents()
-        //this.LoadBertPretrained()
-        initialize_weights bert |> ignore
+        if ifInitWeight then
+            initialize_weights bert |> ignore
 
     member _.LoadBertPretrained(preTrainedDataFilePath) =
-        load_model bert preTrainedDataFilePath 
+        load_model this preTrainedDataFilePath 
     
     member _.forward(tknIds,sepIds,postionIds) =
         use encoded = bert.forward(tknIds,sepIds,postionIds)
@@ -266,7 +356,7 @@ let class_accuracy (y:torch.Tensor) (y':torch.Tensor) =
     |> Seq.average
 
 //adjustment for end of data when full batch may not be available
-let adjPositions currBatchSize = if int currBatchSize = BATCH_SIZE then position_ids else torch.arange(MAX_POS_EMB).expand(currBatchSize,-1L).``to``(device)
+let adjPositions currBatchSize = if int currBatchSize = BATCH_SIZE then position_ids else torch.arange(MAX_POS_EMB,device=device).expand(currBatchSize,-1L)//.``to``(device)
 
 let dispose ls = ls |> List.iter (fun (x:IDisposable) -> x.Dispose())
 
@@ -282,6 +372,18 @@ let processBatch (bertClassification:BertClassification) (ceLoss:Modules.CrossEn
     let loss = ceLoss.forward(y', y_d)   
     y_d, y', loss
 
+
+let processBatch2 (bertClassification:BertClassification) (ceLoss:Modules.CrossEntropyLoss) (tkns:torch.Tensor) (typs:torch.Tensor) (y:torch.Tensor) =
+    //use tkns_d = tkns.``to``(device)
+    //use typs_d = typs.``to``(device)
+    //let y_d    = y.``to``(device)            
+    use positions  = adjPositions tkns.shape.[0]
+    //if device <> torch.CPU then //these were copied so ok to dispose old tensors
+    //    dispose [tkns; typs; y]
+    let y' = bertClassification.forward(tkns, typs, positions)
+    let loss = ceLoss.forward(y', y)   
+    y', loss
+
 //evaluate on test set; return cross-entropy loss and classification accuracy
 let evaluate (bertClassification:BertClassification) (ceLoss:Modules.CrossEntropyLoss) =
     bertClassification.eval()
@@ -289,7 +391,7 @@ let evaluate (bertClassification:BertClassification) (ceLoss:Modules.CrossEntrop
         testBatches 
         |> Seq.map toXY
         |> Seq.map (fun batch ->
-            let y,y',loss = processBatch bertClassification ceLoss batch
+            let y, y',loss = processBatch bertClassification ceLoss batch
             let ls = loss.ToDouble()
             let acc = class_accuracy y y'            
             dispose [y;y';loss]
@@ -303,11 +405,107 @@ let evaluate (bertClassification:BertClassification) (ceLoss:Modules.CrossEntrop
 
 
 
+module PROD =    
+
+    let mutable EPOCHS = 10
+    let mutable verbose = true
+    let _model = new BertClassification(not ifLoadPretrainedModel, device)
+    _model.``to``(device) |> ignore
+    if ifLoadPretrainedModel then
+        _model.LoadBertPretrained weightDataDir
+    let _loss = torch.nn.CrossEntropyLoss()
+    _loss.``to``(device) |> ignore
+    let _opt = torch.optim.Adam(_model.parameters (), 0.001, amsgrad=true)  
+    _opt.``to``(device) |> ignore
+
+    let mutable e = 0
+    
+
+    let toxyed4 = 
+        //let fi = FileInfo @$"{featurePickle}\all.pickler"
+        //if fi.Exists then
+        //    binarySerializer.UnPickle <| File.ReadAllBytes fi.FullName
+        //else
+            let arr = 
+                trainSetIDs 
+                //|> Array.take 300
+                |> Array.mapi (fun i b -> 
+                    if i % 20 = 0 then
+                        printfn $"batch {b}"
+                    let fs = toFeature b
+                    let ls = toLabel b
+                    let d_tkns      = fs |> Seq.collect (fun f -> f.InputIds )  |> Seq.toArray
+                    let d_tkn_typs  = fs |> Seq.collect (fun f -> f.SegmentIds) |> Seq.toArray
+                    d_tkns, d_tkn_typs, ls
+                ) 
+
+            //File.WriteAllBytes (fi.FullName, binarySerializer.Pickle arr)
+            arr
+        //|> Array.map toXY4
+
+
+    //task {printfn "2 %s" (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))} |> ignore
+    //GC.Collect()
+    //task {printfn "3 %s" (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))} |> ignore
+    let train () =
+    
+        while e < EPOCHS do
+            e <- e + 1
+            _model.train()
+            let losses4 = 
+                toxyed4
+                |> Seq.mapi (fun i (d_tkns, d_tkn_typs, labels) ->   
+            
+                    _opt.zero_grad ()   
+                    use tokenIds = torch.tensor(d_tkns,     dtype=torch.int, device=device).view(-1L,MAX_POS_EMB)//.``to``(dev)       
+                    use sepIds   = torch.tensor(d_tkn_typs, dtype=torch.int, device=device).view(-1L,MAX_POS_EMB)//.``to``(dev)     
+                    use y = torch.tensor(labels, dtype=torch.int64, device=device).view(-1L)//.``to``(dev)     
+
+                    let positions  = adjPositions tokenIds.shape.[0]
+
+                    use y' = _model.forward(tokenIds, sepIds, positions)
+                    use loss = _loss.forward(y', y)   
+                    //let yl = processBatch2 _model _loss tokenIds sepIds y
+                    //use y' = fst yl
+                    //use loss = snd yl
+                    let ls = loss.ToDouble()  
+                    loss.backward()
+                    _model.parameters() 
+                    |> Seq.iter (fun t -> 
+                        use _ = t.grad().clip(gradMin,gradMax) 
+                        ()
+                        )
+                    use  t_opt = _opt.step ()
+                    if verbose && i % 100 = 0 then
+                        let acc = class_accuracy y y'
+                        task {printfn "1 %s" (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))} |> ignore
+                        printfn $"Epoch: {e}, minibatch: {i}, ce: {ls}, accuracy: {acc}"  
+                        //GC.Collect()
+                    dispose [y; y';loss]
+                    //task {printfn "2 %s" (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))} |> ignore
+                    GC.Collect()
+                    //task {printfn "3 %s" (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))} |> ignore
+                    ls
+                    )
+                |> Seq.toArray
+            let evalCE, evalAcc = evaluate _model _loss
+            printfn $"Epoch {e} train: {Seq.average losses4}; eval acc: {evalAcc}"
+            
+            save_model _model weightDataDir
+
+
+        printfn "Done train"
+  
+  
+open PROD
+train ()
+
+(*
 module TEST =
     
     
 
-    let testBert = (new BertModel(not ifLoadPretrainedModel))//.``to``(device)
+    let testBert = (new BertModel(not ifLoadPretrainedModel, torch.CPU))//.``to``(device)
 
     if ifLoadPretrainedModel then
         load_model testBert weightDataDir
@@ -329,52 +527,5 @@ module TEST =
     //_tkns |> Tensor.getData<int64>
     let _testOut = testBert.forward(_tkns,_seps,position_ids.cpu()) //test is on cpu
 
+//*)
 
-
-
-module PROD =    
-
-    let mutable EPOCHS = 1
-    let mutable verbose = true
-    let _model = new BertClassification(not ifLoadPretrainedModel)
-
-
-    _model.``to``(device) |> ignore
-    let _loss = torch.nn.CrossEntropyLoss()
-
-    let opt = torch.optim.Adam(_model.parameters (), 0.001, amsgrad=true)  
-
-
-
-    let mutable e = 0
-
-    let toxyed = 
-        trainBatches 
-        |> Seq.mapi (fun i b -> 
-            printfn $"batch {i}"
-            toXY b
-        ) 
-        |> Seq.take 300
-        |> Seq.toArray
-
-
-
-
-    let losses = 
-        toxyed
-        |> Seq.mapi (fun i batch ->                 
-            opt.zero_grad ()   
-            let y, y', loss = processBatch _model _loss batch
-            let ls = loss.ToDouble()  
-            loss.backward()
-            _model.parameters() |> Seq.iter (fun t -> t.grad().clip(gradMin,gradMax) |> ignore)                            
-            use  t_opt = opt.step ()
-            if verbose && i % 100 = 0 then
-                let acc = class_accuracy y y'
-                printfn $"Epoch: {e}, minibatch: {i}, ce: {ls}, accuracy: {acc}"                            
-            dispose [y;y';loss]
-            GC.Collect()
-            ls)
-        |> Seq.toArray
-
-//let evalCE,evalAcc = evaluate e

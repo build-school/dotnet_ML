@@ -6,10 +6,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+	  <Compile Include="Programv3.fsx" />
+    <None Include="Program.v3.fsx.20240602" />
     <None Include="Program.v3.fsx" />
     <None Include="Program.v2.fsx" />
     <None Include="Program.fsx.20240601" />
-    <Compile Include="Program.fsx" />
+	  <None Include="Program.fsx" />
   </ItemGroup>
 
   <ItemGroup>

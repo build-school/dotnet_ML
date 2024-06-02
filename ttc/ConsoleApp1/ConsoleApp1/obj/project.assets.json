@@ -1649,11 +1649,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Administrator\\Downloads\\22222\\ConsoleApp1\\ConsoleApp1\\ConsoleApp1.fsproj",
+      "projectUniqueName": "C:\\anibal\\ttc\\ConsoleApp1\\ConsoleApp1\\ConsoleApp1.fsproj",
       "projectName": "ConsoleApp1",
-      "projectPath": "C:\\Users\\Administrator\\Downloads\\22222\\ConsoleApp1\\ConsoleApp1\\ConsoleApp1.fsproj",
+      "projectPath": "C:\\anibal\\ttc\\ConsoleApp1\\ConsoleApp1\\ConsoleApp1.fsproj",
       "packagesPath": "C:\\Users\\Administrator\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Administrator\\Downloads\\22222\\ConsoleApp1\\ConsoleApp1\\obj\\",
+      "outputPath": "C:\\anibal\\ttc\\ConsoleApp1\\ConsoleApp1\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

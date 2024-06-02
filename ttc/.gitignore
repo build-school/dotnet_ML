@@ -1,0 +1,4 @@
+yelp_review_all_csv/*
+yelp_review_polarity_csv/*
+MyTrainedModel/yelp_review_all_csv.pickle/*
+ConsoleApp1/ConsoleApp1/bin/*
