@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-	  <Compile Include="Programv3.fsx" />
+    <None Include="Program.v4.fsx" />
     <None Include="Program.v3.fsx.20240602" />
     <None Include="Program.v3.fsx" />
     <None Include="Program.v2.fsx" />
