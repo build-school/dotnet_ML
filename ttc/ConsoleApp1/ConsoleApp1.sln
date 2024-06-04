@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34511.84
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.fsproj", "{72A99BCF-12AB-475C-98BA-244D453C0B38}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.fsproj", "{72A99BCF-12AB-475C-98BA-244D453C0B38}"
+EndProject
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "BERTTokenizer", "..\..\..\git\BERTTokenizer\BERTTokenizer\BERTTokenizer.fsproj", "{9B29D075-5390-4232-AB91-53B3829B8FED}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{72A99BCF-12AB-475C-98BA-244D453C0B38}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{72A99BCF-12AB-475C-98BA-244D453C0B38}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{72A99BCF-12AB-475C-98BA-244D453C0B38}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B29D075-5390-4232-AB91-53B3829B8FED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B29D075-5390-4232-AB91-53B3829B8FED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B29D075-5390-4232-AB91-53B3829B8FED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B29D075-5390-4232-AB91-53B3829B8FED}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -19,6 +19,7 @@ open System.Collections.Generic
 open System.IO
 open TfCheckpoint
 open TorchSharp
+
 open System.Collections.Concurrent
 open MBrace.FsPickler.nstd20
 open System.IO
@@ -131,9 +132,12 @@ let device = if torch.cuda_is_available() then torch.CUDA else torch.CPU
 printfn $"torch devices is %A{device}"
 
 
-let ver = 3
+let ver = 4
+printfn $"Current ver: {ver}"
 let weightDataDir = 
     match ver with
+    | 5 ->
+        @"C:\anibal\ttc\MyTrainedModel\yelp_review_all_csv.v5"
     | 4 ->
         @"C:\anibal\ttc\MyTrainedModel\yelp_review_all_csv.v4"
     | _ ->
@@ -144,7 +148,9 @@ let ifLoadPretrainedModel =
     let di = DirectoryInfo weightDataDir
     if not di.Exists then
         di.Create()
-    (DirectoryInfo weightDataDir).GetFiles().Length <> 0
+    let rst = (DirectoryInfo weightDataDir).GetFiles().Length <> 0
+    printfn $"ifLoadPretrainedModel: {rst}"
+    rst
 
 //tensor dims - these values should match the relevant dimensions of the corresponding tensors in the checkpoint
 let HIDDEN      = 
@@ -242,6 +248,7 @@ type BertEmbedding(ifInitWeight,dev:torch.Device) as this =
             this.initWeight ()
 
     member this.initWeight () =
+        printfn "initializing weights for BertEmbedding"
         initialize_weights this
         
 
@@ -356,7 +363,7 @@ let testBatchTakeNum = 0
 let BATCH_SIZE = 
     match ver with
     | 4 ->
-        256
+        256 
     | _ ->
         128
 let trainBatches = 
@@ -409,31 +416,41 @@ let labelTrainPickle = Path.Join($"{weightDataDir}.pickle","label.Train")
 
 //featurePickle
 
-let preProcessFeature tag (dataArrArr:YelpReview[][]) dirPath batchTakeNum =
+let preProcessFeature (tag:string) (dataArrArr:YelpReview[][]) dirPath batchTakeNum =
     let di = DirectoryInfo dirPath
     if not di.Exists then
         di.Create ()
     if di.GetFiles().Length = 0 then //表示 feature pickle 是空的
         storeByteArraysInUnmanagedMemory (
-            match batchTakeNum with
-            | 0 ->
-                dataArrArr 
-            | _ ->
-                dataArrArr
-                |> Array.truncate batchTakeNum
-            |> Array.mapi (fun i trainData ->
-                if i % 100 = 0 then
-                    printfn $"preProcessFeature new {tag} {i}"
-                //task { Container.batchDict.GetOrAdd ((tag, i), trainData) |> ignore } |> ignore
-                let f = Array.map b2f trainData
-                //task { Container.featureDict.GetOrAdd((tag, i), fun k -> f) |> ignore } |> ignore
-                let bArr = binarySerializer.Pickle f
-                task { 
-                    let fi = Path.Join(dirPath, $"{i}.pickle") |> FileInfo
-                    File.WriteAllBytes(fi.FullName, bArr)  
-                } |> ignore
-                bArr
-            )
+            let rst =
+                match batchTakeNum with
+                | 0 ->
+                    dataArrArr 
+                | _ ->
+                    dataArrArr
+                    |> Array.truncate batchTakeNum
+                |> Seq.mapi (fun i trainData ->
+                    async {
+                        if i % 100 = 0 then
+                            printfn $"preProcessFeature new {tag} {i}"
+                        //task { Container.batchDict.GetOrAdd ((tag, i), trainData) |> ignore } |> ignore
+                        let f = Array.map b2f trainData
+                        //task { Container.featureDict.GetOrAdd((tag, i), fun k -> f) |> ignore } |> ignore
+                        let bArr = binarySerializer.Pickle f
+                        //task { 
+                        let fi = Path.Join(dirPath, $"{i}.pickle") |> FileInfo
+                        File.WriteAllBytes(fi.FullName, bArr)  
+                    
+                        return (i, bArr)
+                    }
+                )
+            let frst =
+                rst
+                |> Async.Parallel
+                |> Async.RunSynchronously
+                |> Array.sortBy fst
+                |> Array.map snd
+            frst
         )
     else
         storeByteArraysInUnmanagedMemory (
@@ -596,7 +613,8 @@ type BertClassification(ifInitWeight,dev:torch.Device) as this =
     let dropout2 = 
         match ver with
         | 4 ->
-            torch.nn.Dropout(0.1).``to``(dev) 
+            null
+            //torch.nn.Dropout(HIDDEN_DROPOUT_PROB).``to``(dev) 
         | _ ->
             null
 
@@ -612,6 +630,7 @@ type BertClassification(ifInitWeight,dev:torch.Device) as this =
     do
         this.RegisterComponents()
         if ifInitWeight then
+            printfn "initializing weights for BertClassification"
             initialize_weights bert |> ignore
 
     member _.LoadBertPretrained(preTrainedDataFilePath) =
@@ -621,7 +640,8 @@ type BertClassification(ifInitWeight,dev:torch.Device) as this =
         use encoded = bert.forward(tknIds,sepIds,postionIds)
         match ver with
         | 4 ->
-            encoded --> intermediate --> dropout2 --> proj 
+            //encoded --> intermediate --> dropout2 --> proj 
+            encoded --> intermediate --> proj 
             //encoded --> intermediate --> proj 
         | _ ->
             encoded --> proj 
@@ -684,12 +704,68 @@ let evaluate (bertClassification:BertClassification) (ceLoss:Modules.CrossEntrop
     let acc = lss |> Seq.averageBy snd
     ls,acc
 
+(* v4
+2024-06-02 22:21:47.380 2024-06-02 22:30:26.305 0.6043797953964194
+*)
 
+(* v3
+1 2024-06-03 00:00:38.792
+Epoch: 1, minibatch: 0, ce: 0.7228368520736694, accuracy: 0.6875
+1 2024-06-03 00:00:49.279
+Epoch: 1, minibatch: 100, ce: 0.7479696869850159, accuracy: 0.6875
+1 2024-06-03 00:00:59.651
+Epoch: 1, minibatch: 200, ce: 0.7646732330322266, accuracy: 0.625
+1 2024-06-03 00:01:10.071
+Epoch: 1, minibatch: 300, ce: 0.8740653991699219, accuracy: 0.5859375
+1 2024-06-03 00:01:20.377
+Epoch: 1, minibatch: 400, ce: 0.729203462600708, accuracy: 0.703125
+
+
+1 2024-06-03 00:10:17.471
+Epoch: 2, minibatch: 0, ce: 0.7034833431243896, accuracy: 0.6640625
+1 2024-06-03 00:10:27.899
+Epoch: 2, minibatch: 100, ce: 0.7307177186012268, accuracy: 0.6796875
+1 2024-06-03 00:10:38.148
+Epoch: 2, minibatch: 200, ce: 0.7118231058120728, accuracy: 0.6796875
+1 2024-06-03 00:10:48.352
+Epoch: 2, minibatch: 300, ce: 0.8153849840164185, accuracy: 0.65625
+1 2024-06-03 00:10:58.744
+Epoch: 2, minibatch: 400, ce: 0.6903365254402161, accuracy: 0.734375
+
+
+Epoch: 3, minibatch: 3300, ce: 0.6020061373710632, accuracy: 0.734375
+1 2024-06-03 00:25:29.337
+Epoch: 3, minibatch: 3400, ce: 0.7369936108589172, accuracy: 0.6953125
+1 2024-06-03 00:25:39.666
+Epoch: 3, minibatch: 3500, ce: 0.7706311345100403, accuracy: 0.6640625
+1 2024-06-03 00:25:50.069
+Epoch: 3, minibatch: 3600, ce: 0.8399091362953186, accuracy: 0.65625
+1 2024-06-03 00:26:00.379
+Epoch: 3, minibatch: 3700, ce: 0.7615535855293274, accuracy: 0.6484375
+1 2024-06-03 00:26:10.752
+Epoch: 3, minibatch: 3800, ce: 0.6535578966140747, accuracy: 0.7109375
+1 2024-06-03 00:26:21.255
+Epoch: 3, minibatch: 3900, ce: 0.5560261607170105, accuracy: 0.75
+
+Epoch: 4, minibatch: 3300, ce: 0.6165979504585266, accuracy: 0.75
+1 2024-06-03 00:34:52.101
+Epoch: 4, minibatch: 3400, ce: 0.6594852805137634, accuracy: 0.6875
+1 2024-06-03 00:35:02.010
+Epoch: 4, minibatch: 3500, ce: 0.6909313201904297, accuracy: 0.6875
+1 2024-06-03 00:35:11.989
+Epoch: 4, minibatch: 3600, ce: 0.860692024230957, accuracy: 0.640625
+1 2024-06-03 00:35:22.153
+Epoch: 4, minibatch: 3700, ce: 0.7567017674446106, accuracy: 0.671875
+1 2024-06-03 00:35:32.401
+Epoch: 4, minibatch: 3800, ce: 0.6383547782897949, accuracy: 0.7265625
+1 2024-06-03 00:35:42.372
+Epoch: 4, minibatch: 3900, ce: 0.5137653946876526, accuracy: 0.7578125
+*)
 
 
 module PROD =    
 
-    let mutable EPOCHS = 10
+    let mutable EPOCHS = 20
     let mutable verbose = true
     let _model = new BertClassification(not ifLoadPretrainedModel, device)
     _model.``to``(device) |> ignore
@@ -699,6 +775,8 @@ module PROD =
     _loss.``to``(device) |> ignore
     let _opt = torch.optim.Adam(_model.parameters (), 0.001, amsgrad=true)  
     _opt.``to``(device) |> ignore
+
+    let _scheduler = torch.optim.lr_scheduler.StepLR(_opt, step_size=1, gamma=0.95)
 
     let mutable e = 0
     
@@ -765,7 +843,7 @@ module PROD =
                     use  t_opt = _opt.step ()
                     if verbose && i % 100 = 0 then
                         let acc = class_accuracy y y'
-                        task {printfn "1 %s" (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))} |> ignore
+                        task {printfn "%s" (DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"))} |> ignore
                         printfn $"Epoch: {e}, minibatch: {i}, ce: {ls}, accuracy: {acc}"  
                         //GC.Collect()
                     dispose [y; y';loss]
@@ -775,8 +853,9 @@ module PROD =
                     ls
                     )
                 |> Seq.toArray
+            _scheduler.step ()
             let evalCE, evalAcc = evaluate _model _loss
-            printfn $"Epoch {e} train: {Seq.average losses4}; eval acc: {evalAcc}"
+            printfn $"Epoch {e} train, loss avg: {Seq.average losses4}; eval acc: {evalAcc}"
             
             save_model _model weightDataDir
 
@@ -815,4 +894,3 @@ module TEST =
     let _testOut = testBert.forward(_tkns,_seps,position_ids.cpu()) //test is on cpu
 
 //*)
-
