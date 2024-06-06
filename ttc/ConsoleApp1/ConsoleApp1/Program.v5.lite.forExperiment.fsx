@@ -65,15 +65,80 @@ fsi.AddPrinter(fun (tensor: torch.Tensor) ->
 )
 
 
+
+let rec formatTensor_001 (tensor: torch.Tensor) level =
+    match tensor.dim() with
+    | 1L -> // 如果是一维张量，直接格式化输出
+        let values = tensor.data<single>().ToArray()
+        let formattedValues = values |> Array.map (sprintf "%g") |> String.concat " "
+        sprintf "[%s]" formattedValues
+    | _ -> // 如果是多维张量，递归地处理每一个切片
+        let slices = [ for i in 0L .. tensor.shape.[0] - 1L -> tensor[i]]
+        let formattedSlices = slices |> List.map (fun s -> formatTensor_001 s (level + 1))
+        formattedSlices |> String.concat (sprintf "\n%s" (String.replicate (level * 2) " "))
+
+let rec formatTensor_002 (tensor: torch.Tensor) : string =
+    match tensor.dim() with
+    | 1L -> // 一维张量
+        let values = tensor.data<single>().ToArray()  // 假设数据类型为single
+        "[" + (values |> Array.map (sprintf "%g") |> String.concat ", ") + "]"
+    | _ -> // 多维张量
+        let slices = [ for i in 0L .. tensor.shape.[0] - 1L -> tensor[i]]
+        let formattedSlices = slices |> List.map formatTensor_002
+        "[" + (formattedSlices |> String.concat ", \r\n") + "]"
+
+// 递归函数来格式化多维张量，添加indent参数来管理缩进
+let rec formatTensor_003 (tensor: torch.Tensor) indent : string =
+    let indentString = String.replicate indent "  "
+    match tensor.dim() with
+    | 1L -> // 一维张量
+        let values = tensor.data<single>().ToArray()  // 假设数据类型为single
+        "[" + (values |> Array.map (sprintf "%g") |> String.concat ", ") + "]"
+    | _ -> // 多维张量
+        let slices = [ for i in 0L .. tensor.shape.[0] - 1L -> tensor[i]]
+        let formattedSlices = slices |> List.map (fun s -> formatTensor_003 s (indent + 2))
+        "[\n" + 
+        (formattedSlices |> List.map (fun s -> indentString + s) |> String.concat ", \n") + 
+        "\n" + indentString + "]"
+
+// 递归函数来格式化多维张量，添加indent参数来管理缩进
+let rec formatTensor (tensor: torch.Tensor) indent : string =
+    let indentString = String.replicate (indent + 1) " " // 每层缩进增加两个空格
+    match tensor.dim() with
+    | 1L -> // 一维张量
+        let values = tensor.data<single>().ToArray()  // 假设数据类型为single
+        "[" + (values |> Array.map (sprintf "%g") |> String.concat ", ") + "]"
+    | _ -> // 多维张量
+        let slices = [ for i in 0L .. tensor.shape.[0] - 1L -> tensor[i]]
+        let formattedSlices = slices |> List.map (fun s -> formatTensor s (indent + 1))
+        "[\n" + 
+        (formattedSlices |> List.map (fun s -> indentString + s) |> String.concat ", \n") + 
+        "\n" + String.replicate (indent) " " + "]"
+
+let limitLines (text: string) maxLines indentString =
+    let lines = text.Split('\n')
+    if lines.Length <= maxLines then
+        text
+    else
+        let start = lines.[0..9] // Take the first 5 lines
+        let end' = lines.[lines.Length - 10..] // Take the last 5 lines
+        System.String.Join("\n", Array.append start (Array.append [|"..."; indentString|] end'))
+
+
+fsi.AddPrinter(fun (tensor: torch.Tensor) ->
+    let shape = tensor.shape
+    let dtype = tensor.dtype
+    let device = tensor.device
+    let formattedTensor = formatTensor tensor 0
+    let limitedOutput = limitLines formattedTensor 11 " "
+    sprintf "Tensor [%d x %d x ...], type = %A, device = %A\n%s" tensor.shape.[0] tensor.shape.[1] dtype device limitedOutput
+)
+
+
+
 // 创建一个 Tensor 并查看输出
-let tensor = torch.randn([|3L; 4L; 5L|])
+let tensor = torch.randn([|3L; 4L; 5L; 2L|])
 tensor  
-
-
-
-
-
-
 
 
 (*
@@ -219,6 +284,14 @@ let ifLoadPretrainedModel =
     let rst = (DirectoryInfo weightDataDir).GetFiles().Length <> 0
     printfn $"ifLoadPretrainedModel: {rst}"
     rst
+
+
+let t = torch.zeros([|2L; 3L; 4L|], torch.ScalarType.Float32, device=torch.CUDA)
+torch.backends.cuda.matmul.allow_tf32 <- true
+
+let t = torch.zeros([|2L; 3L; 4L|], torch.ScalarType.Float32, device=torch.CUDA)
+
+
 
 //tensor dims - these values should match the relevant dimensions of the corresponding tensors in the checkpoint
 let HIDDEN      = 
