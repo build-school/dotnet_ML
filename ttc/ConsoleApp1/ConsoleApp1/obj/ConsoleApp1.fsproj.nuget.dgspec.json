@@ -74,12 +74,12 @@
             },
             "TorchSharp": {
               "target": "Package",
-              "version": "[0.102.4, )",
+              "version": "[0.102.5, )",
               "generatePathProperty": true
             },
             "TorchSharp-cuda-windows": {
               "target": "Package",
-              "version": "[0.102.4, )",
+              "version": "[0.102.5, )",
               "generatePathProperty": true
             }
           },

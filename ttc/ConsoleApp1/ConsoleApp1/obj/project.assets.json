@@ -722,7 +722,7 @@
           }
         }
       },
-      "TorchSharp/0.102.4": {
+      "TorchSharp/0.102.5": {
         "type": "package",
         "dependencies": {
           "Google.Protobuf": "3.21.9",
@@ -763,10 +763,10 @@
           }
         }
       },
-      "TorchSharp-cuda-windows/0.102.4": {
+      "TorchSharp-cuda-windows/0.102.5": {
         "type": "package",
         "dependencies": {
-          "TorchSharp": "0.102.4",
+          "TorchSharp": "0.102.5",
           "libtorch-cuda-12.1-win-x64": "2.2.1.1"
         },
         "build": {
@@ -1588,10 +1588,10 @@
         "tfproto.nuspec"
       ]
     },
-    "TorchSharp/0.102.4": {
-      "sha512": "L3I8NczpKmmDlmZuAkOX0GeMZUU5ko06opDFPuto/wgpUg1xTrNBQxQ2mbCyKqTb1KZzqT2LVYcQJnzj2NNj9g==",
+    "TorchSharp/0.102.5": {
+      "sha512": "6rOpVTrvh4719IWYrHXzm802KZzKkP4t6tCkfyqQMnkqhoN1u9bQZT3m+w41yvhY7JN1uQ2SfznD/pNtX4Kj7g==",
       "type": "package",
-      "path": "torchsharp/0.102.4",
+      "path": "torchsharp/0.102.5",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1606,14 +1606,14 @@
         "runtimes/osx-arm64/native/libLibTorchSharp.dylib",
         "runtimes/osx-x64/native/libLibTorchSharp.dylib",
         "runtimes/win-x64/native/LibTorchSharp.dll",
-        "torchsharp.0.102.4.nupkg.sha512",
+        "torchsharp.0.102.5.nupkg.sha512",
         "torchsharp.nuspec"
       ]
     },
-    "TorchSharp-cuda-windows/0.102.4": {
-      "sha512": "3fG6nKzFFI3VAjPI1upbuDTwgAxQTRPRkXFHZQ2MUOGyegq9+gHdeaPe0jPKVbzFiTsWJ9fVrFF3cwhFcVq7Xg==",
+    "TorchSharp-cuda-windows/0.102.5": {
+      "sha512": "nJtp3ZesmF35H+cII5t8rv44btHRN9PqOFYrKvms3CdIu9PUuPP6Ig5BkAjp1ayR++UNC/e5xIMsd056Eonf0Q==",
       "type": "package",
-      "path": "torchsharp-cuda-windows/0.102.4",
+      "path": "torchsharp-cuda-windows/0.102.5",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1625,7 +1625,7 @@
         "buildTransitive/netstandard2.0/TorchSharp-cuda-windows.targets",
         "lib/net6.0/_._/empty.txt",
         "lib/netstandard2.0/_._/empty.txt",
-        "torchsharp-cuda-windows.0.102.4.nupkg.sha512",
+        "torchsharp-cuda-windows.0.102.5.nupkg.sha512",
         "torchsharp-cuda-windows.nuspec"
       ]
     }
@@ -1638,8 +1638,8 @@
       "FsPickler.Json.nstd20 >= 7.0.1",
       "FsPickler.nstd20 >= 7.0.1",
       "TfCheckpoint >= 1.0.0",
-      "TorchSharp >= 0.102.4",
-      "TorchSharp-cuda-windows >= 0.102.4"
+      "TorchSharp >= 0.102.5",
+      "TorchSharp-cuda-windows >= 0.102.5"
     ]
   },
   "packageFolders": {
@@ -1716,12 +1716,12 @@
           },
           "TorchSharp": {
             "target": "Package",
-            "version": "[0.102.4, )",
+            "version": "[0.102.5, )",
             "generatePathProperty": true
           },
           "TorchSharp-cuda-windows": {
             "target": "Package",
-            "version": "[0.102.4, )",
+            "version": "[0.102.5, )",
             "generatePathProperty": true
           }
         },

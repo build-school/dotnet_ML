@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Program.v7.50.fsx" />
+    <None Include="Program.v7.31.fsx" />
     <Compile Include="Program.v5.lite.forExperiment.fsx" />
     <Compile Include="Program.v5.fsx.20240603" />
     <Compile Include="Program.v5.fsx" />
@@ -23,8 +25,8 @@
     <PackageReference Include="FsPickler.Json.nstd20" Version="7.0.1" />
     <PackageReference Include="FsPickler.nstd20" Version="7.0.1" />
     <PackageReference Include="TfCheckpoint" Version="1.0.0" />
-    <PackageReference Include="TorchSharp" Version="0.102.4" />
-    <PackageReference Include="TorchSharp-cuda-windows" Version="0.102.4" />
+    <PackageReference Include="TorchSharp" Version="0.102.5" />
+    <PackageReference Include="TorchSharp-cuda-windows" Version="0.102.5" />
   </ItemGroup>
 
   <ItemGroup>

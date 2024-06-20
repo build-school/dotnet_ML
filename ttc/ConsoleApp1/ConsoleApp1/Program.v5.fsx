@@ -133,6 +133,7 @@ printfn $"torch devices is %A{device}"
 
 
 let ver = 4
+
 printfn $"Current ver: {ver}"
 let weightDataDir = 
     match ver with
@@ -791,15 +792,20 @@ module PROD =
                 //|> Array.take 300
                 //let tag = "train"
                 //let batchId = 0
-                |> Array.mapi (fun i (tag, batchId) -> 
-                    if i % 20 = 0 then
-                        printfn $"batch {tag} {batchId}"
-                    let fs = toFeature tag batchId
-                    let ls = toLabel tag batchId
-                    let d_tkns      = fs |> Seq.collect (fun f -> f.InputIds )  |> Seq.toArray
-                    let d_tkn_typs  = fs |> Seq.collect (fun f -> f.SegmentIds) |> Seq.toArray
-                    d_tkns, d_tkn_typs, ls
+                |> Seq.mapi (fun i (tag, batchId) -> 
+                    async {
+                        if i % 20 = 0 then
+                            printfn $"batch {tag} {batchId}"
+                        let fs = toFeature tag batchId
+                        let ls = toLabel tag batchId
+                        let d_tkns      = fs |> Seq.collect (fun f -> f.InputIds )  |> Seq.toArray
+                        let d_tkn_typs  = fs |> Seq.collect (fun f -> f.SegmentIds) |> Seq.toArray
+                        return d_tkns, d_tkn_typs, ls
+                    }
                 ) 
+                |> Async.Parallel
+                |> Async.RunSynchronously
+                
             //Container.batchDict <- null
             //Container.featureDict <- null
             //Container.labelDict <- null
@@ -837,7 +843,7 @@ module PROD =
                     loss.backward()
                     _model.parameters() 
                     |> Seq.iter (fun t -> 
-                        use _ = t.grad().clip(gradMin,gradMax) 
+                        use _ = t.grad.clip(gradMin,gradMax) 
                         ()
                         )
                     use  t_opt = _opt.step ()

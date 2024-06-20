@@ -637,7 +637,7 @@ module PROD =
                     loss.backward()
                     _model.parameters() 
                     |> Seq.iter (fun t -> 
-                        use _ = t.grad().clip(gradMin,gradMax) 
+                        use _ = t.grad.clip(gradMin,gradMax) 
                         ()
                         )
                     use  t_opt = _opt.step ()

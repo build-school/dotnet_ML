@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
-    <Import Project="$(NuGetPackageRoot)torchsharp\0.102.4\buildTransitive\net6.0\TorchSharp.targets" Condition="Exists('$(NuGetPackageRoot)torchsharp\0.102.4\buildTransitive\net6.0\TorchSharp.targets')" />
+    <Import Project="$(NuGetPackageRoot)torchsharp\0.102.5\buildTransitive\net6.0\TorchSharp.targets" Condition="Exists('$(NuGetPackageRoot)torchsharp\0.102.5\buildTransitive\net6.0\TorchSharp.targets')" />
     <Import Project="$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part9-primary\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part9-primary.targets" Condition="Exists('$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part9-primary\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part9-primary.targets')" />
     <Import Project="$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part9-fragment2\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part9-fragment2.targets" Condition="Exists('$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part9-fragment2\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part9-fragment2.targets')" />
     <Import Project="$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part9-fragment1\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part9-fragment1.targets" Condition="Exists('$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part9-fragment1\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part9-fragment1.targets')" />
@@ -17,6 +17,6 @@
     <Import Project="$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part10\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part10.targets" Condition="Exists('$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part10\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part10.targets')" />
     <Import Project="$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part1\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part1.targets" Condition="Exists('$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64-part1\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64-part1.targets')" />
     <Import Project="$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64.targets" Condition="Exists('$(NuGetPackageRoot)libtorch-cuda-12.1-win-x64\2.2.1.1\buildTransitive\netstandard2.0\libtorch-cuda-12.1-win-x64.targets')" />
-    <Import Project="$(NuGetPackageRoot)torchsharp-cuda-windows\0.102.4\buildTransitive\net6.0\TorchSharp-cuda-windows.targets" Condition="Exists('$(NuGetPackageRoot)torchsharp-cuda-windows\0.102.4\buildTransitive\net6.0\TorchSharp-cuda-windows.targets')" />
+    <Import Project="$(NuGetPackageRoot)torchsharp-cuda-windows\0.102.5\buildTransitive\net6.0\TorchSharp-cuda-windows.targets" Condition="Exists('$(NuGetPackageRoot)torchsharp-cuda-windows\0.102.5\buildTransitive\net6.0\TorchSharp-cuda-windows.targets')" />
   </ImportGroup>
 </Project>

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "Wok1roeInPXJrQK1IrRCdUkqcFM7I43dVP5dtIm1x4jFWQzYLp2NqvkIdwrTIpoXzGFy8JpQoEQ6UFVo2/qIvg==",
+  "dgSpecHash": "z2u7rtHyVlA09mcYNTtkLkAbOXB084Sp9fdULlvABuACJhQhokF8UZh95CKpjavEHBS9cLo0h/mECPon8oefvg==",
   "success": true,
   "projectFilePath": "C:\\anibal\\ttc\\ConsoleApp1\\ConsoleApp1\\ConsoleApp1.fsproj",
   "expectedPackageFiles": [
@@ -43,8 +43,8 @@
     "C:\\Users\\Administrator\\.nuget\\packages\\system.reflection.emit.lightweight\\4.7.0\\system.reflection.emit.lightweight.4.7.0.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\tfcheckpoint\\1.0.0\\tfcheckpoint.1.0.0.nupkg.sha512",
     "C:\\Users\\Administrator\\.nuget\\packages\\tfproto\\1.0.0\\tfproto.1.0.0.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\torchsharp\\0.102.4\\torchsharp.0.102.4.nupkg.sha512",
-    "C:\\Users\\Administrator\\.nuget\\packages\\torchsharp-cuda-windows\\0.102.4\\torchsharp-cuda-windows.0.102.4.nupkg.sha512"
+    "C:\\Users\\Administrator\\.nuget\\packages\\torchsharp\\0.102.5\\torchsharp.0.102.5.nupkg.sha512",
+    "C:\\Users\\Administrator\\.nuget\\packages\\torchsharp-cuda-windows\\0.102.5\\torchsharp-cuda-windows.0.102.5.nupkg.sha512"
   ],
   "logs": []
 }

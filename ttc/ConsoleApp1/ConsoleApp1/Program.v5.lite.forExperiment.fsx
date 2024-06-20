@@ -292,6 +292,8 @@ torch.backends.cuda.matmul.allow_tf32 <- true
 let t = torch.zeros([|2L; 3L; 4L|], torch.ScalarType.Float32, device=torch.CUDA)
 
 
+let device = if torch.cuda.is_available() then torch.CUDA else torch.CPU
+let dev = device
 
 //tensor dims - these values should match the relevant dimensions of the corresponding tensors in the checkpoint
 let HIDDEN      = 
@@ -529,7 +531,7 @@ let testBatches =
 let vocabFile = @"C:\anibal\ttc\vocab.txt"
 let vocab = Vocabulary.loadFromFile vocabFile
 
-let position_ids = torch.arange(MAX_POS_EMB,device=device).expand(int64 BATCH_SIZE,-1L)//.``to``(device)
+let position_ids = torch.arange(MAX_POS_EMB,device=device, dtype=torch.ScalarType.Float32).expand(int64 BATCH_SIZE,-1L)//.``to``(device)
 
 torch.arange(MAX_POS_EMB,device=device).data<int64>()|>Seq.length
 
@@ -750,7 +752,6 @@ let inline toXY4 (dev:torch.Device, d_tkns:int[], d_tkn_typs:int[], labels:int[]
     let Y = torch.tensor(labels, dtype=torch.int64, device=dev).view(-1L)//.``to``(dev)     
     (tokenIds,sepIds),Y
 
-let device = if torch.cuda.is_available() then torch.CUDA else torch.CPU
 
 // 创建一个全连接层
 let linearLayer = torch.nn.Linear(10, 5) // 输入特征数为10，输出特征数为5
